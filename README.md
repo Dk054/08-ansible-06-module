@@ -158,20 +158,84 @@ if __name__ == '__main__':
 ```
 Или возьмите это наполнение [из статьи](https://docs.ansible.com/ansible/latest/dev_guide/developing_modules_general.html#creating-a-module).
 
-**Шаг 3.** Заполните файл в соответствии с требованиями Ansible так, чтобы он выполнял основную задачу: module должен создавать текстовый файл на удалённом хосте по пути, определённом в параметре `path`, с содержимым, определённым в параметре `content`.
+**Шаг 3.** Заполните файл в соответствии с требованиями Ansible так, чтобы он выполнял основную задачу: module должен создавать текстовый файл на удалённом хосте по пути, 
+определённом в параметре `path`, с содержимым, определённым в параметре `content`.
+``` 
+---- cd ~/ansible
+---- . venv/bin/activate && . hacking/env-setup 
+---- chmod +x library/my_own_module.py
+ ```
 
 **Шаг 4.** Проверьте module на исполняемость локально.
+---
+1) Создал файл с аргументами
+``` 
+cat > args.json << 'EOF'
+{
+"ANSIBLE_MODULE_ARGS": {
+"path": "/tmp/test_module.txt",
+"content": "Это тестовое содержимое",
+"force": false
+}
+}
+EOF
+```
+2) Запуск модуля  python library/my_own_module.py args.json
+Вывод:
+``` python library/my_own_module.py args.json
 
+{"changed": true, "path": "/tmp/test_module.txt", "content": "\u042d\u0442\u043e \u0442\u0435\u0441\u0442\u043e\u0432\u043e\u0435 \u0441\u043e\u0434\u0435\u0440\u0436\u0438\u043c\u043e\u0435", "uid": 0, "gid": 0, "owner": "root", "group": "root", "mode": "0644", "state": "file", "size": 44, "invocation": {"module_args": {"path": "/tmp/test_module.txt", "content": "\u042d\u0442\u043e \u0442\u0435\u0441\u0442\u043e\u0432\u043e\u0435 \u0441\u043e\u0434\u0435\u0440\u0436\u0438\u043c\u043e\u0435", "force": false}}
+ ```
+файл создан 
+``` cat /tmp/test_module.txt
+Это тестовое содержимое(venv) 
+```
+Информация о фалйе
+```
+ls -la /tmp/test_module.txt
+-rw-r--r-- 1 root root 44 фев 15 13:05 /tmp/test_module.txt
+```
+**Модуль работает**
+---
 **Шаг 5.** Напишите single task playbook и используйте module в нём.
-
+```
+cat > test_module.yml << 'EOF'
+---
+- name: Test my_own_module
+  hosts: localhost
+  gather_facts: yes  # Меняем на yes чтобы собирать факты
+  tasks:
+    - name: Create test file using module
+      my_own_module:
+        path: "/tmp/ansible_test.txt"
+        content: |
+          This file was created by Ansible module
+          at {{ ansible_date_time.iso8601 }}
+        force: false
+EOF
+```
 **Шаг 6.** Проверьте через playbook на идемпотентность.
 
+прогнал два раза, вот последний вывод
+```
+
+ok: [localhost]
+
+PLAY RECAP *******************************************************************************************************************************************************
+localhost                  : ok=2    changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+```
+![img.png](img.png)
 **Шаг 7.** Выйдите из виртуального окружения.
 
 **Шаг 8.** Инициализируйте новую collection: `ansible-galaxy collection init my_own_namespace.yandex_cloud_elk`.
 
 **Шаг 9.** В эту collection перенесите свой module в соответствующую директорию.
-
+```
+/root/my_own_namespace/yandex_cloud_elk/
+└── plugins/
+    └── modules/
+        └── my_own_module.py
+```
 **Шаг 10.** Single task playbook преобразуйте в single task role и перенесите в collection. У role должны быть default всех параметров module.
 
 **Шаг 11.** Создайте playbook для использования этой role.
@@ -183,11 +247,13 @@ if __name__ == '__main__':
 **Шаг 14.** Создайте ещё одну директорию любого наименования, перенесите туда single task playbook и архив c collection.
 
 **Шаг 15.** Установите collection из локального архива: `ansible-galaxy collection install <archivename>.tar.gz`.
-
+![img_2.png](img_2.png)
 **Шаг 16.** Запустите playbook, убедитесь, что он работает.
+ansible-playbook -i localhost, use_role.yml -e 'ansible_collections_path=./collections'
+![img_1.png](img_1.png)
 
 **Шаг 17.** В ответ необходимо прислать ссылки на collection и tar.gz архив, а также скриншоты выполнения пунктов 4, 6, 15 и 16.
-
+https://github.com/Dk054/my_own_collection/blob/master/README.md
 ## Необязательная часть
 
 1. Реализуйте свой модуль для создания хостов в Yandex Cloud.
